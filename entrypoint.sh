@@ -42,6 +42,8 @@ for f in /tmp/bitcoin/releases/*; do
         echo "Found cached $(basename $f)"
     fi
 done
+# set chmod +x to releases/**/bin/*
+find /tmp/bitcoin/releases -type f -exec chmod +x {} \;
 
 sed -i "s|functional/test_runner.py |functional/test_runner.py --previous-releases --timeout-factor=10 --exclude=feature_dbcrash -j$(nproc) |g" ./Makefile.am && \
     sed -i 's|$(LCOV) -z $(LCOV_OPTS) -d $(abs_builddir)/src||g' ./Makefile.am
