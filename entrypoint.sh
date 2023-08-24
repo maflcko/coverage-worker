@@ -4,6 +4,7 @@ set -e
 err() {
     echo "Error occurred:"
     awk 'NR>L-4 && NR<L+4 { printf "%-5d%3s%s\n",NR,(NR==L?">>>":""),$0 }' L=$1 $0
+    curl -X POST "$ERROR_WEBHOOK" -H 'Content-Type: application/json' -d '{"text":"Error occurred in bitcoin-coverage: '$1'"}'
 }
 trap 'err $LINENO' ERR
 
@@ -20,7 +21,7 @@ cd /tmp/bitcoin
 git fetch origin pull/$PR_NUM/head && git checkout FETCH_HEAD
 
 # check depends folder exists in gcloud bucket 'bitcoin-coverage-cache'
-if gsutil -q stat gs://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu/; then
+if gsutil ls gs://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu/; then
     echo "Found cached depends folder"
     gsutil -m cp -r gs://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu /tmp/bitcoin/depends
 else
@@ -54,3 +55,5 @@ make cov
 
 gcovr --json --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb > coverage.json
 gsutil cp coverage.json gs://bitcoin-coverage-data/$PR_NUM/coverage.json
+
+curl -X POST "$SUCCESS_WEBHOOK"

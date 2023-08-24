@@ -1,7 +1,7 @@
 FROM debian:bullseye
 
 # run curl healthcheck every 5 seconds
-HEALTHCHECK --interval=5s --timeout=3s CMD curl ${HEALTHCHECK_URL} || exit 1
+HEALTHCHECK --interval=5s --timeout=3s CMD curl -X POST ${HEALTHCHECK_WEBHOOK} -H "Content-Type: application/json" -d '{"text":"Bitcoin coverage build is running"}' || exit 1
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CCACHE_DIR=/cache/ccache
