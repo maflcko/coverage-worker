@@ -26,7 +26,7 @@ if gsutil ls gs://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu/; then
     gsutil -m cp -r gs://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu /tmp/bitcoin/depends
 else
     echo "No cached depends folder found"
-    make -C depends NO_BOOST=1 NO_LIBEVENT=1 NO_QT=1 NO_SQLITE=1 NO_NATPMP=1 NO_UPNP=1 NO_ZMQ=1 NO_USDT=1
+    CC=clang CXX=clang++ make -C depends NO_BOOST=1 NO_LIBEVENT=1 NO_QT=1 NO_SQLITE=1 NO_NATPMP=1 NO_UPNP=1 NO_ZMQ=1 NO_USDT=1
     gsutil -m cp -r /tmp/bitcoin/depends/x86_64-pc-linux-gnu gs://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu
 fi
 
@@ -49,11 +49,37 @@ find /tmp/bitcoin/releases -type f -exec chmod +x {} \;
 sed -i "s|functional/test_runner.py |functional/test_runner.py --previous-releases --timeout-factor=10 --exclude=feature_dbcrash -j$(nproc) |g" ./Makefile.am && \
     sed -i 's|$(LCOV) -z $(LCOV_OPTS) -d $(abs_builddir)/src||g' ./Makefile.am
 
-./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq --disable-bench BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
-make -j$(nproc)
+./autogen.sh && CXX=clang++ CC=clang ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq --disable-bench BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
+bear -- make -j$(nproc)
 make cov
 
-gcovr --json --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb > coverage.json
+gcovr --json --gcov-executable "llvm-cov gcov" --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb > coverage.json
 gsutil cp coverage.json gs://bitcoin-coverage-data/$PR_NUM/coverage.json
 
-curl -X POST "$SUCCESS_WEBHOOK"
+
+changed_files=$(git --no-pager diff --name-only FETCH_HEAD $(git merge-base FETCH_HEAD master))
+changed_files=$(echo "$changed_files" | grep -E "^src/")
+changed_files=$(echo "$changed_files" | grep -vE "^src/(test|wallet/test)/")
+changed_files=$(echo "$changed_files" | grep -E "\.(cpp|h)$")
+changed_files=$(echo "$changed_files" | tr '\n' ' ')
+
+# for each file create an array of object like [{"name": "spend.cpp}, ...]
+filter=$(echo "$changed_files" | jq -R -s -c 'split("\n")[:-1] | map({"name": .})')
+sed -i 's|/tmp/bitcoin/||g' fixes.yml
+
+mutators=$(clang-tidy -load /usr/lib/libbitcoin-mutator.so --list-checks --checks=mutator-* | grep "mutator-")
+
+mkdir /tmp/mutations
+for mutator in $mutators; do
+    echo "clang-tidy -load /usr/lib/libbitcoin-mutator.so --checks=$mutator --line-filter='$filter' --export-fixes=/tmp/mutations/$mutator.yml $changed_files" >> commands.txt
+done
+
+parallel --jobs $(nproc) < commands.txt
+gsutil -m cp -r /tmp/mutations gs://bitcoin-coverage-data/$PR_NUM/mutations
+
+if [ -n "$SUCCESS_WEBHOOK" ]; then
+    echo "Sending success webhook"
+    curl -X POST "$SUCCESS_WEBHOOK"
+else 
+    echo "No success webhook set"
+fi
