@@ -19,7 +19,7 @@ RUN apt update && apt install google-cloud-cli -y
 RUN git config --global user.email "bitcoin-coverage@aureleoules.com"
 RUN git config --global user.name "bitcoin-coverage"
 
-RUN wget https://nightly.link/bitcoin-coverage/clang-tidy-mutators/workflows/cmake-single-platform/master/libbitcoin-mutator.so.zip?h=1b1a87b8efa5f7fc36e228bb8e3ec95dea0d8529 -O libbitcoin-mutator.so.zip && \
+RUN wget https://nightly.link/bitcoin-coverage/chernobyl/workflows/cmake-single-platform/master/libbitcoin-mutator.so.zip?h=c25bdfbe7b86210a96437322d9633c6003aebba5 -O libbitcoin-mutator.so.zip && \
     unzip libbitcoin-mutator.so.zip && \
     mv libbitcoin-mutator.so /usr/lib/ && \
     rm -rf libbitcoin-mutator.so.zip
