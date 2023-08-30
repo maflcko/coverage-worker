@@ -62,10 +62,12 @@ changed_files=$(echo "$changed_files" | grep -E "^src/")
 changed_files=$(echo "$changed_files" | grep -vE "^src/(test|wallet/test)/")
 changed_files=$(echo "$changed_files" | grep -E "\.(cpp|h)$")
 changed_files=$(echo "$changed_files" | tr '\n' ' ')
+changed_files=$(echo "$changed_files" | sed 's/ $//g')
+# remove src/ from each file
+changed_files_base=$(echo "$changed_files" | sed 's/src\///g')
 
-# for each file create an array of object like [{"name": "spend.cpp}, ...]
-filter=$(echo "$changed_files" | jq -R -s -c 'split("\n")[:-1] | map({"name": .})')
-sed -i 's|/tmp/bitcoin/||g' fixes.yml
+# for each file create an array of object like [{"name": "spend.cpp"}, {"name": ...]
+filter="[{\"name\": \"$(echo "$changed_files_base" | sed 's| |\"}, {\"name\": \"|g')\"}]"
 
 mutators=$(clang-tidy -load /usr/lib/libbitcoin-mutator.so --list-checks --checks=mutator-* | grep "mutator-")
 
@@ -75,7 +77,11 @@ for mutator in $mutators; do
 done
 
 parallel --jobs $(nproc) < commands.txt
-gsutil -m cp -r /tmp/mutations gs://bitcoin-coverage-data/$PR_NUM/mutations
+sed -i 's|/tmp/bitcoin/||g' /tmp/mutations/*.yml
+
+cd /tmp/mutations && zip -r /tmp/mutations.zip *
+
+gsutil -m cp -r /tmp/mutations.zip gs://bitcoin-coverage-data/$PR_NUM/mutations.zip
 
 if [ -n "$SUCCESS_WEBHOOK" ]; then
     echo "Sending success webhook"
