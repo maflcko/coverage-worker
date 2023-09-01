@@ -12,9 +12,10 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
 RUN update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-16 100
 RUN update-alternatives --install /usr/bin/llvm-cov llvm-cov /usr/bin/llvm-cov-16 100
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-RUN apt update && apt install google-cloud-cli -y
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf awscliv2.zip aws
 
 RUN git config --global user.email "bitcoin-coverage@aureleoules.com"
 RUN git config --global user.name "bitcoin-coverage"
