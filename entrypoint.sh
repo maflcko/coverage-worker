@@ -8,7 +8,7 @@ git fetch origin pull/$PR_NUM/head && git checkout FETCH_HEAD
 # check depends folder exists in gcloud bucket 'bitcoin-coverage-cache'
 if aws s3 ls s3://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu/; then
     echo "Found cached depends folder"
-    aws s3 cp --recursive s3://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu /tmp/bitcoin/depends
+    aws s3 cp --recursive s3://bitcoin-coverage-cache/depends/x86_64-pc-linux-gnu /tmp/bitcoin/depends/x86_64-pc-linux-gnu
 else
     echo "No cached depends folder found"
     CC=clang CXX=clang++ make -C depends NO_BOOST=1 NO_LIBEVENT=1 NO_QT=1 NO_SQLITE=1 NO_NATPMP=1 NO_UPNP=1 NO_ZMQ=1 NO_USDT=1
