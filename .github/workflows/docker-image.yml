@@ -8,14 +8,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Log in to Docker Hub
-      uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
     - uses: actions/checkout@v3
     - name: Build the Docker image
-      run: docker build . --tag aureleoules/bitcoin-coverage:latest
-    - name: Push the Docker image
-      run: docker push aureleoules/bitcoin-coverage:latest
-
+      run: docker build . --tag bitcoin-coverage-coverage-worker:latest
+    - name: Push to ECR
+      uses: jwalton/gh-ecr-push@v1
+      with:
+        access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        region: eu-west-1
+        image: bitcoin-coverage-coverage-worker:latest
