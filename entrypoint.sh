@@ -34,7 +34,7 @@ for mutator in $mutators; do
     echo "clang-tidy -load /usr/lib/libbitcoin-mutator.so --checks=$mutator --line-filter='$filter' --export-fixes=/tmp/mutations/$mutator.yml $changed_files" >> commands.txt
 done
 
-parallel --jobs $(nproc) < commands.txt
+parallel --jobs $(nproc) < commands.txt || true
 sed -i 's|/tmp/bitcoin/||g' /tmp/mutations/*.yml
 
 cd /tmp/mutations && zip -r /tmp/mutations.zip *
