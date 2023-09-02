@@ -9,12 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Configure AWS CLI
+      run: aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }} && aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }} && aws configure set region us-east-1
+    - name: Login to ECR
+      run: aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/i3s2n0b6
     - name: Build the Docker image
-      run: docker build . --tag bitcoin-coverage-coverage-worker:latest
+      run: docker build . --tag public.ecr.aws/i3s2n0b6/bitcoin-coverage-coverage-worker:latest
     - name: Push to ECR
-      uses: jwalton/gh-ecr-push@v1
-      with:
-        access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        region: us-east-1
-        image: bitcoin-coverage-coverage-worker:latest
+      run: docker push public.ecr.aws/i3s2n0b6/bitcoin-coverage-coverage-worker:latest
