@@ -30,4 +30,9 @@ RUN mkdir -p /tmp/bitcoin/releases && ./test/get_previous_releases.py -b
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+RUN useradd -ms /bin/bash coverage
+RUN chown -R coverage:coverage /tmp
+USER coverage
+
 ENTRYPOINT ["/entrypoint.sh"]
