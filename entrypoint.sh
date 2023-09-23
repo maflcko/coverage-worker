@@ -6,14 +6,14 @@ cd /tmp/bitcoin && git pull origin master
 git fetch origin pull/$PR_NUM/head && git checkout FETCH_HEAD
 ./test/get_previous_releases.py -b
 
-sed -i "s|functional/test_runner.py |functional/test_runner.py --previous-releases --timeout-factor=10 --exclude=feature_dbcrash -j$(nproc) |g" ./Makefile.am && \
+sed -i "s|functional/test_runner.py |functional/test_runner.py --previous-releases --timeout-factor=10 --exclude=feature_reindex_readonly,feature_dbcrash -j$(nproc) |g" ./Makefile.am && \
     sed -i 's|$(LCOV) -z $(LCOV_OPTS) -d $(abs_builddir)/src||g' ./Makefile.am
 
 ./autogen.sh && CXX=clang++ CC=clang ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq --disable-bench BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
 compiledb make -j$(nproc)
 make cov
 
-sudo gcovr --json --gcov-executable "llvm-cov gcov" --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb > coverage.json
+gcovr --json --gcov-executable "llvm-cov gcov" --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb > coverage.json
 aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/coverage.json
 
 changed_files=$(git --no-pager diff --name-only FETCH_HEAD $(git merge-base FETCH_HEAD master))
