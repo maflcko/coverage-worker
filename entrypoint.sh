@@ -13,7 +13,7 @@ sed -i "s|functional/test_runner.py |functional/test_runner.py --previous-releas
 compiledb make -j$(nproc)
 make cov
 
-gcovr --json --gcov-executable "llvm-cov gcov" --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb > coverage.json
+sudo gcovr --json --gcov-executable "llvm-cov gcov" --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb > coverage.json
 aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/coverage.json
 
 changed_files=$(git --no-pager diff --name-only FETCH_HEAD $(git merge-base FETCH_HEAD master))
