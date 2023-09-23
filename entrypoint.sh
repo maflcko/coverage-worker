@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+ccache --show-stats
 
 cd /tmp/bitcoin && git pull origin master
 git fetch origin pull/$PR_NUM/head && git checkout FETCH_HEAD
@@ -9,7 +10,7 @@ sed -i "s|functional/test_runner.py |functional/test_runner.py --previous-releas
     sed -i 's|$(LCOV) -z $(LCOV_OPTS) -d $(abs_builddir)/src||g' ./Makefile.am
 
 ./autogen.sh && CXX=clang++ CC=clang ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq --disable-bench BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
-bear -- make -j$(nproc)
+compiledb make -j$(nproc)
 make cov
 
 gcovr --json --gcov-executable "llvm-cov gcov" --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb > coverage.json
