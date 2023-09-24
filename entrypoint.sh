@@ -19,6 +19,7 @@ make cov
 gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-executable "llvm-cov gcov" --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt > coverage.json
 aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/coverage.json
 
+set +e
 changed_files=$(git --no-pager diff --name-only FETCH_HEAD $(git merge-base FETCH_HEAD master))
 
 if [ -n "$changed_files" ]; then
