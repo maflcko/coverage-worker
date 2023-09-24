@@ -30,20 +30,22 @@ if [ -n "$changed_files" ]; then
     # remove src/ from each file
     changed_files_base=$(echo "$changed_files" | sed 's/src\///g')
 
-    # for each file create an array of object like [{"name": "spend.cpp"}, {"name": ...]
-    filter="[{\"name\": \"$(echo "$changed_files_base" | sed 's| |\"}, {\"name\": \"|g')\"}]"
+    if [ -n "$changed_files_base" ]; then
+        # for each file create an array of object like [{"name": "spend.cpp"}, {"name": ...]
+        filter="[{\"name\": \"$(echo "$changed_files_base" | sed 's| |\"}, {\"name\": \"|g')\"}]"
 
-    mutators=$(clang-tidy -load /usr/lib/libbitcoin-mutator.so --list-checks --checks=mutator-* | grep "mutator-")
+        mutators=$(clang-tidy -load /usr/lib/libbitcoin-mutator.so --list-checks --checks=mutator-* | grep "mutator-")
 
-    mkdir /tmp/mutations
-    for mutator in $mutators; do
-        echo "clang-tidy -load /usr/lib/libbitcoin-mutator.so --checks=$mutator --line-filter='$filter' --export-fixes=/tmp/mutations/$mutator.yml $changed_files" >> commands.txt
-    done
+        mkdir /tmp/mutations
+        for mutator in $mutators; do
+            echo "clang-tidy -load /usr/lib/libbitcoin-mutator.so --checks=$mutator --line-filter='$filter' --export-fixes=/tmp/mutations/$mutator.yml $changed_files" >> commands.txt
+        done
 
-    parallel --jobs $(nproc) < commands.txt || true
-    sed -i 's|/tmp/bitcoin/||g' /tmp/mutations/*.yml
+        parallel --jobs $(nproc) < commands.txt || true
+        sed -i 's|/tmp/bitcoin/||g' /tmp/mutations/*.yml
 
-    cd /tmp/mutations && zip -r /tmp/mutations.zip *
+        cd /tmp/mutations && zip -r /tmp/mutations.zip *
 
-    aws s3 cp /tmp/mutations.zip s3://bitcoin-coverage-data/$PR_NUM/mutations.zip
+        aws s3 cp /tmp/mutations.zip s3://bitcoin-coverage-data/$PR_NUM/mutations.zip
+    fi
 fi
