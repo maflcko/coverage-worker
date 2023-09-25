@@ -8,7 +8,7 @@ git fetch origin pull/$PR_NUM/head && git checkout FETCH_HEAD
 
 NPROC_2=$(expr $(nproc) \* 2)
 echo "NPROC_2=$NPROC_2"
-sed -i "s|functional/test_runner.py |functional/test_runner.py --previous-releases --timeout-factor=10 --exclude=feature_reindex_readonly,feature_dbcrash -j$NPROC_2 |g" ./Makefile.am
+sed -i "s|functional/test_runner.py |functional/test_runner.py -F --previous-releases --timeout-factor=10 --exclude=feature_reindex_readonly,feature_dbcrash -j$NPROC_2 |g" ./Makefile.am
 sed -i 's|$(MAKE) -C src/ check|./src/test/test_bitcoin --list_content 2>\&1 \| grep -v "    " \| parallel --halt now,fail=1 ./src/test/test_bitcoin -t {} 2>\&1|g' ./Makefile.am
 sed -i 's|$(LCOV) -z $(LCOV_OPTS) -d $(abs_builddir)/src||g' ./Makefile.am
 
