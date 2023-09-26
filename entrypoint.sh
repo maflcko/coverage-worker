@@ -45,8 +45,8 @@ if [ -n "$changed_files" ]; then
         parallel --jobs $(nproc) < commands.txt || true
         sed -i 's|/tmp/bitcoin/||g' /tmp/mutations/*.yml
 
-        cd /tmp/mutations && zip -r /tmp/mutations.zip *
+        cd /tmp/mutations && zip -r /tmp/mutations.zip * || true
 
-        aws s3 cp /tmp/mutations.zip s3://bitcoin-coverage-data/$PR_NUM/mutations.zip
+        aws s3 cp /tmp/mutations.zip s3://bitcoin-coverage-data/$PR_NUM/mutations.zip || true
     fi
 fi
