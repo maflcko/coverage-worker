@@ -22,7 +22,7 @@ aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/coverage.json
 last_master_commit=$(curl "https://sonarcloud.io/api/project_analyses/search?project=aureleoules_bitcoin&branch=master" | jq -r '.analyses[0].revision')
 # check if the last master commit is the same as the current master commit
 if [ "$last_master_commit" != "$(git rev-parse master)" ]; then
-    git checkout master
+    git stash && git checkout master
     # If it is not, we need to update the master branch on sonarcloud
     echo "Updating master branch on sonarcloud"
     /usr/lib/sonar-scanner/bin/sonar-scanner \
