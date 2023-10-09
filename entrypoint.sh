@@ -12,8 +12,13 @@ sed -i "s|functional/test_runner.py |functional/test_runner.py -F --previous-rel
 sed -i 's|$(MAKE) -C src/ check|./src/test/test_bitcoin --list_content 2>\&1 \| grep -v "    " \| parallel --halt now,fail=1 ./src/test/test_bitcoin -t {} 2>\&1|g' ./Makefile.am
 sed -i 's|$(LCOV) -z $(LCOV_OPTS) -d $(abs_builddir)/src||g' ./Makefile.am
 
-./autogen.sh && CXX=clang++ CC=clang ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq --disable-bench BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
-compiledb make -j$(nproc)
+# create function 
+function configure_and_compile() {
+    ./autogen.sh && CXX=clang++ CC=clang ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq --disable-bench BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
+    compiledb make -j$(nproc)
+}
+
+configure_and_compile
 make cov
 
 gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-executable "llvm-cov gcov" --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt > coverage.json
@@ -21,8 +26,11 @@ aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/coverage.json
 
 last_master_commit=$(curl "https://sonarcloud.io/api/project_analyses/search?project=aureleoules_bitcoin&branch=master" | jq -r '.analyses[0].revision')
 # check if the last master commit is the same as the current master commit
+checked_master=0
 if [ "$last_master_commit" != "$(git rev-parse master)" ]; then
     git stash && git checkout master
+    make clean
+    configure_and_compile
     # If it is not, we need to update the master branch on sonarcloud
     echo "Updating master branch on sonarcloud"
     /usr/lib/sonar-scanner/bin/sonar-scanner \
@@ -36,6 +44,13 @@ if [ "$last_master_commit" != "$(git rev-parse master)" ]; then
         -Dsonar.cfamily.threads=$(nproc)
 
     git checkout FETCH_HEAD
+
+    checked_master=1
+fi
+
+if [ "$checked_master" -eq 1 ]; then
+    make clean
+    configure_and_compile
 fi
 
 echo "Updating $PR_NUM branch on sonarcloud"
