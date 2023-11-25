@@ -8,8 +8,8 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     ./aws/install && \
     rm -rf awscliv2.zip aws
 
-RUN git config --global user.email "bitcoin-coverage@aureleoules.com"
-RUN git config --global user.name "bitcoin-coverage"
+RUN git config --global user.email "ci@corecheck.dev"
+RUN git config --global user.name "corecheck"
 
 RUN wget https://github.com/mozilla/sccache/releases/download/v0.5.4/sccache-v0.5.4-x86_64-unknown-linux-musl.tar.gz && \
     tar -xvf sccache-v0.5.4-x86_64-unknown-linux-musl.tar.gz && \
