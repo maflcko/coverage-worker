@@ -28,7 +28,7 @@ aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage
 
 modprobe msr
 pyperf system tune
-./src/bench/bench_bitcoin -output-json=bench.json
+./src/bench/bench_bitcoin -output-json=bench.json -min-time=1000
 aws s3 cp bench.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
 pyperf system reset
 
