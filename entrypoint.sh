@@ -20,21 +20,14 @@ fi
 ./test/get_previous_releases.py -b
 
 NPROC_2=$(expr $(nproc) \* 2)
-echo "NPROC_2=$NPROC_2"
-sed -i "s|functional/test_runner.py |functional/test_runner.py -F --previous-releases --timeout-factor=10 --exclude=feature_reindex_readonly,feature_dbcrash -j$NPROC_2 |g" ./Makefile.am
-sed -i 's|$(MAKE) -C src/ check|./src/test/test_bitcoin --list_content 2>\&1 \| grep -v "    " \| parallel --halt now,fail=1 ./src/test/test_bitcoin -t {} 2>\&1|g' ./Makefile.am
-sed -i 's|$(LCOV) -z $(LCOV_OPTS) -d $(abs_builddir)/src||g' ./Makefile.am
 
-# create function
-function configure_and_compile() {
-    ./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
-    compiledb make -j$(nproc)
-}
+./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
+time compiledb make -j$(nproc)
 
-configure_and_compile
-make cov
+time ./src/test/test_bitcoin --list_content 2>&1 | grep -v "    " | parallel --halt now,fail=1 ./src/test/test_bitcoin -t {} 2>&1
+time python3 test/functional/test_runner.py -F --previous-releases --timeout-factor=10 --exclude=feature_reindex_readonly,feature_dbcrash -j$NPROC_2
 
-gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt > coverage.json
+time gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt -j $(nproc) > coverage.json
 if [ "$IS_MASTER" != "true" ]; then
     aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
 else
