@@ -14,7 +14,7 @@ sed -i 's|$(LCOV) -z $(LCOV_OPTS) -d $(abs_builddir)/src||g' ./Makefile.am
 
 # create function 
 function configure_and_compile() {
-    ./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq --disable-bench BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
+    ./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
     compiledb make -j$(nproc)
 }
 
@@ -23,6 +23,12 @@ make cov
 
 gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt > coverage.json
 aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/$(git rev-parse HEAD)/coverage.json
+
+modprobe msr
+pyperf system tune
+./src/bench/bench_bitcoin -output-json=bench.json
+aws s3 cp bench.json s3://bitcoin-coverage-data/$PR_NUM/$(git rev-parse HEAD)/bench.json
+pyperf system reset
 
 last_master_commit=$(curl "https://sonarcloud.io/api/project_analyses/search?project=aureleoules_bitcoin&branch=master" | jq -r '.analyses[0].revision')
 # check if the last master commit is the same as the current master commit
