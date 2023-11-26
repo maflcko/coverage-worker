@@ -3,7 +3,9 @@ set -e
 ccache --show-stats
 
 cd /tmp/bitcoin && git pull origin master
-git fetch origin pull/$PR_NUM/head && git checkout FETCH_HEAD && git rebase master
+git fetch origin pull/$PR_NUM/head && git checkout FETCH_HEAD
+HEAD_COMMIT=$(git rev-parse HEAD)
+git rebase master
 ./test/get_previous_releases.py -b
 
 NPROC_2=$(expr $(nproc) \* 2)
@@ -22,12 +24,12 @@ configure_and_compile
 make cov
 
 gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt > coverage.json
-aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/$(git rev-parse HEAD)/coverage.json
+aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
 
 modprobe msr
 pyperf system tune
 ./src/bench/bench_bitcoin -output-json=bench.json
-aws s3 cp bench.json s3://bitcoin-coverage-data/$PR_NUM/$(git rev-parse HEAD)/bench.json
+aws s3 cp bench.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
 pyperf system reset
 
 last_master_commit=$(curl "https://sonarcloud.io/api/project_analyses/search?project=aureleoules_bitcoin&branch=master" | jq -r '.analyses[0].revision')
