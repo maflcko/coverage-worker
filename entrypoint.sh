@@ -36,7 +36,7 @@ fi
 
 modprobe msr
 pyperf system tune
-./src/bench/bench_bitcoin -output-json=bench.json -min-time=1000
+time ./src/bench/bench_bitcoin -output-json=bench.json -min-time=1000
 
 if [ "$IS_MASTER" != "true" ]; then
     aws s3 cp bench.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
@@ -48,7 +48,7 @@ pyperf system reset
 
 if [ "$IS_MASTER" != "true" ]; then
     echo "Updating $PR_NUM branch on sonarcloud"
-    /usr/lib/sonar-scanner/bin/sonar-scanner \
+    time /usr/lib/sonar-scanner/bin/sonar-scanner \
     -Dsonar.organization=aureleoules \
     -Dsonar.projectKey=aureleoules_bitcoin \
     -Dsonar.sources=. \
@@ -61,7 +61,7 @@ if [ "$IS_MASTER" != "true" ]; then
     -Dsonar.branch.target=master
 else
     echo "Updating master branch on sonarcloud"
-    /usr/lib/sonar-scanner/bin/sonar-scanner \
+    time /usr/lib/sonar-scanner/bin/sonar-scanner \
     -Dsonar.organization=aureleoules \
     -Dsonar.projectKey=aureleoules_bitcoin \
     -Dsonar.sources=. \
