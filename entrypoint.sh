@@ -24,27 +24,50 @@ NPROC_2=$(expr $(nproc) \* 2)
 ./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
 time compiledb make -j$(nproc)
 
-time ./src/test/test_bitcoin --list_content 2>&1 | grep -v "    " | parallel --halt now,fail=1 ./src/test/test_bitcoin -t {} 2>&1
-time python3 test/functional/test_runner.py -F --previous-releases --timeout-factor=10 --exclude=feature_reindex_readonly,feature_dbcrash -j$NPROC_2
-
-time gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt -j $(nproc) > coverage.json
+# check if coverage.json has already been uploaded
 if [ "$IS_MASTER" != "true" ]; then
-    aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
+    aws s3 ls s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
 else
-    aws s3 cp coverage.json s3://bitcoin-coverage-data/master/$COMMIT/coverage.json
+    aws s3 ls s3://bitcoin-coverage-data/master/$COMMIT/coverage.json
 fi
 
-modprobe msr
-pyperf system tune
-time ./src/bench/bench_bitcoin -output-json=bench.json -min-time=1000
-
-if [ "$IS_MASTER" != "true" ]; then
-    aws s3 cp bench.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
+if [ $? -eq 0 ]; then
+    echo "Coverage data already exists for this commit"
 else
-    aws s3 cp bench.json s3://bitcoin-coverage-data/master/$COMMIT/bench.json
+    time ./src/test/test_bitcoin --list_content 2>&1 | grep -v "    " | parallel --halt now,fail=1 ./src/test/test_bitcoin -t {} 2>&1
+    time python3 test/functional/test_runner.py -F --previous-releases --timeout-factor=10 --exclude=feature_reindex_readonly,feature_dbcrash -j$NPROC_2
+
+    time gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt -j $(nproc) > coverage.json
+
+    if [ "$IS_MASTER" != "true" ]; then
+        aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
+    else
+        aws s3 cp coverage.json s3://bitcoin-coverage-data/master/$COMMIT/coverage.json
+    fi
 fi
 
-pyperf system reset
+# check if bench.json has already been uploaded
+if [ "$IS_MASTER" != "true" ]; then
+    aws s3 ls s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
+else
+    aws s3 ls s3://bitcoin-coverage-data/master/$COMMIT/bench.json
+fi
+
+if [ $? -eq 0 ]; then
+    echo "Bench data already exists for this commit"
+else
+    modprobe msr
+    pyperf system tune
+    time ./src/bench/bench_bitcoin -output-json=bench.json -min-time=1000
+
+    if [ "$IS_MASTER" != "true" ]; then
+        aws s3 cp bench.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
+    else
+        aws s3 cp bench.json s3://bitcoin-coverage-data/master/$COMMIT/bench.json
+    fi
+
+    pyperf system reset
+fi
 
 if [ "$IS_MASTER" != "true" ]; then
     echo "Updating $PR_NUM branch on sonarcloud"
