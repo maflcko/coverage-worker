@@ -24,12 +24,15 @@ NPROC_2=$(expr $(nproc) \* 2)
 ./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
 time compiledb make -j$(nproc)
 
+set +e
 # check if coverage.json has already been uploaded
 if [ "$IS_MASTER" != "true" ]; then
     aws s3 ls s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
 else
     aws s3 ls s3://bitcoin-coverage-data/master/$COMMIT/coverage.json
 fi
+
+set -e
 
 if [ $? -eq 0 ]; then
     echo "Coverage data already exists for this commit"
@@ -46,12 +49,15 @@ else
     fi
 fi
 
+
+set +e
 # check if bench.json has already been uploaded
 if [ "$IS_MASTER" != "true" ]; then
     aws s3 ls s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
 else
     aws s3 ls s3://bitcoin-coverage-data/master/$COMMIT/bench.json
 fi
+set -e
 
 if [ $? -eq 0 ]; then
     echo "Bench data already exists for this commit"
