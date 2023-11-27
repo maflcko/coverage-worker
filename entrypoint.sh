@@ -28,7 +28,9 @@ NPROC_2=$(expr $(nproc) \* 2)
 ./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
 time compiledb make -j$(nproc)
 
+set +e
 coverage_exists=$(aws s3 ls $S3_COVERAGE_FILE)
+set -e
 
 if [ "$coverage_exists" != "" ]; then
     echo "Coverage data already exists for this commit"
@@ -42,7 +44,9 @@ else
 fi
 
 
+set +e
 bench_exists=$(aws s3 ls $S3_BENCH_FILE)
+set -e
 
 if [ "$bench_exists" != "" ]; then
     echo "Bench data already exists for this commit"
