@@ -13,8 +13,12 @@ if [ "$IS_MASTER" != "true" ]; then
     fi
     
     git rebase master
+    S3_COVERAGE_FILE=s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
+    S3_BENCH_FILE=s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
 else
     git checkout $COMMIT
+    S3_COVERAGE_FILE=s3://bitcoin-coverage-data/master/$COMMIT/coverage.json
+    S3_BENCH_FILE=s3://bitcoin-coverage-data/master/$COMMIT/bench.json
 fi
 
 ./test/get_previous_releases.py -b
@@ -24,17 +28,9 @@ NPROC_2=$(expr $(nproc) \* 2)
 ./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
 time compiledb make -j$(nproc)
 
-set +e
-# check if coverage.json has already been uploaded
-if [ "$IS_MASTER" != "true" ]; then
-    aws s3 ls s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
-else
-    aws s3 ls s3://bitcoin-coverage-data/master/$COMMIT/coverage.json
-fi
+coverage_exists=$(aws s3 ls $S3_COVERAGE_FILE)
 
-set -e
-
-if [ $? -eq 0 ]; then
+if [ "$coverage_exists" != "" ]; then
     echo "Coverage data already exists for this commit"
 else
     time ./src/test/test_bitcoin --list_content 2>&1 | grep -v "    " | parallel --halt now,fail=1 ./src/test/test_bitcoin -t {} 2>&1
@@ -42,35 +38,20 @@ else
 
     time gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt -j $(nproc) > coverage.json
 
-    if [ "$IS_MASTER" != "true" ]; then
-        aws s3 cp coverage.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
-    else
-        aws s3 cp coverage.json s3://bitcoin-coverage-data/master/$COMMIT/coverage.json
-    fi
+    aws s3 cp coverage.json $S3_COVERAGE_FILE
 fi
 
 
-set +e
-# check if bench.json has already been uploaded
-if [ "$IS_MASTER" != "true" ]; then
-    aws s3 ls s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
-else
-    aws s3 ls s3://bitcoin-coverage-data/master/$COMMIT/bench.json
-fi
-set -e
+bench_exists=$(aws s3 ls $S3_BENCH_FILE)
 
-if [ $? -eq 0 ]; then
+if [ "$bench_exists" != "" ]; then
     echo "Bench data already exists for this commit"
 else
     modprobe msr
     pyperf system tune
     time ./src/bench/bench_bitcoin -output-json=bench.json -min-time=1000
 
-    if [ "$IS_MASTER" != "true" ]; then
-        aws s3 cp bench.json s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
-    else
-        aws s3 cp bench.json s3://bitcoin-coverage-data/master/$COMMIT/bench.json
-    fi
+    aws s3 cp bench.json $S3_BENCH_FILE
 
     pyperf system reset
 fi
