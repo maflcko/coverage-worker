@@ -53,7 +53,7 @@ if [ "$bench_exists" != "" ]; then
 else
     modprobe msr
     pyperf system tune
-    time ./src/bench/bench_bitcoin -output-json=bench.json -min-time=5000
+    time ./src/bench/bench_bitcoin -output-json=bench.json -min-time=1000
 
     aws s3 cp bench.json $S3_BENCH_FILE
 
