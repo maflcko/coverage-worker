@@ -51,7 +51,7 @@ set -e
 if [ "$bench_exists" != "" ]; then
     echo "Bench data already exists for this commit"
 else
-    pyperf system tune
+    pyperf system tune || true
 
     bench_list=$(./src/bench/bench_bitcoin -list)
     time echo "$bench_list" | taskset -c 1-7 parallel --use-cores-instead-of-threads -k --halt now,fail=1 ./src/bench/bench_bitcoin -filter={} -min-time=20000 -output-json={}-bench.json
@@ -68,7 +68,7 @@ else
 
     aws s3 cp bench.json $S3_BENCH_FILE
 
-    pyperf system reset
+    pyperf system reset || true
 fi
 
 # if [ "$IS_MASTER" != "true" ]; then
