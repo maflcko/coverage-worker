@@ -51,38 +51,49 @@ set -e
 if [ "$bench_exists" != "" ]; then
     echo "Bench data already exists for this commit"
 else
-    modprobe msr
     pyperf system tune
-    time ./src/bench/bench_bitcoin -output-json=bench.json -min-time=1000
+
+    bench_list=$(./src/bench/bench_bitcoin -list)
+    time echo "$bench_list" | taskset -c 1-7 parallel --use-cores-instead-of-threads -k --halt now,fail=1 ./src/bench/bench_bitcoin -filter={} -min-time=20000 -output-json={}-bench.json
+    # each file outputs {"results": [{...}]}
+    # we want to merge all the results into one file
+    echo '{"results": [' > bench.json
+    for bench in $bench_list; do
+        cat $bench-bench.json | jq '.results[0]' >> bench.json
+        echo "," >> bench.json
+    done
+    # remove last comma
+    sed -i '$ s/.$//' bench.json
+    echo "]}" >> bench.json
 
     aws s3 cp bench.json $S3_BENCH_FILE
 
     pyperf system reset
 fi
 
-if [ "$IS_MASTER" != "true" ]; then
-    echo "Updating $PR_NUM branch on sonarcloud"
-    time /usr/lib/sonar-scanner/bin/sonar-scanner \
-    -Dsonar.organization=aureleoules \
-    -Dsonar.projectKey=aureleoules_bitcoin \
-    -Dsonar.sources=. \
-    -Dsonar.cfamily.compile-commands=compile_commands.json \
-    -Dsonar.host.url=https://sonarcloud.io \
-    -Dsonar.exclusions='src/crc32c/**, src/crypto/ctaes/**, src/leveldb/**, src/minisketch/**, src/secp256k1/**, src/univalue/**' \
-    -Dsonar.cfamily.threads=$(nproc) \
-    -Dsonar.branch.name=$PR_NUM \
-    -Dsonar.cfamily.analysisCache.mode=server \
-    -Dsonar.branch.target=master
-else
-    echo "Updating master branch on sonarcloud"
-    time /usr/lib/sonar-scanner/bin/sonar-scanner \
-    -Dsonar.organization=aureleoules \
-    -Dsonar.projectKey=aureleoules_bitcoin \
-    -Dsonar.sources=. \
-    -Dsonar.cfamily.compile-commands=compile_commands.json \
-    -Dsonar.host.url=https://sonarcloud.io \
-    -Dsonar.exclusions='src/crc32c/**, src/crypto/ctaes/**, src/leveldb/**, src/minisketch/**, src/secp256k1/**, src/univalue/**' \
-    -Dsonar.cfamily.threads=$(nproc) \
-    -Dsonar.branch.name=master \
-    -Dsonar.cfamily.analysisCache.mode=server
-fi
+# if [ "$IS_MASTER" != "true" ]; then
+#     echo "Updating $PR_NUM branch on sonarcloud"
+#     time /usr/lib/sonar-scanner/bin/sonar-scanner \
+#     -Dsonar.organization=aureleoules \
+#     -Dsonar.projectKey=aureleoules_bitcoin \
+#     -Dsonar.sources=. \
+#     -Dsonar.cfamily.compile-commands=compile_commands.json \
+#     -Dsonar.host.url=https://sonarcloud.io \
+#     -Dsonar.exclusions='src/crc32c/**, src/crypto/ctaes/**, src/leveldb/**, src/minisketch/**, src/secp256k1/**, src/univalue/**' \
+#     -Dsonar.cfamily.threads=$(nproc) \
+#     -Dsonar.branch.name=$PR_NUM \
+#     -Dsonar.cfamily.analysisCache.mode=server \
+#     -Dsonar.branch.target=master
+# else
+#     echo "Updating master branch on sonarcloud"
+#     time /usr/lib/sonar-scanner/bin/sonar-scanner \
+#     -Dsonar.organization=aureleoules \
+#     -Dsonar.projectKey=aureleoules_bitcoin \
+#     -Dsonar.sources=. \
+#     -Dsonar.cfamily.compile-commands=compile_commands.json \
+#     -Dsonar.host.url=https://sonarcloud.io \
+#     -Dsonar.exclusions='src/crc32c/**, src/crypto/ctaes/**, src/leveldb/**, src/minisketch/**, src/secp256k1/**, src/univalue/**' \
+#     -Dsonar.cfamily.threads=$(nproc) \
+#     -Dsonar.branch.name=master \
+#     -Dsonar.cfamily.analysisCache.mode=server
+# fi
