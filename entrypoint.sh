@@ -51,10 +51,27 @@ set -e
 if [ "$bench_exists" != "" ]; then
     echo "Bench data already exists for this commit"
 else
+    BENCH_DURATION=30000
     pyperf system tune || true
 
     bench_list=$(./src/bench/bench_bitcoin -list)
-    time echo "$bench_list" | taskset -c 1-7 parallel --use-cores-instead-of-threads -k --halt now,fail=1 ./src/bench/bench_bitcoin -filter={} -min-time=20000 -output-json={}-bench.json
+    time echo "$bench_list" | taskset -c 1-7 parallel --use-cores-instead-of-threads -k --halt now,fail=1 ./src/bench/bench_bitcoin -filter={} -min-time=$BENCH_DURATION -output-json={}-bench.json
+
+    # check that all benchmarks have a medianAbsolutePercentError(elapsed) < 0.01 (1%), otherwise rerun them
+    bench_to_rerun=""
+    for bench in $bench_list; do
+        medianAbsolutePercentError=$(cat $bench-bench.json | jq '.results[0]["medianAbsolutePercentError(elapsed)"]' | sed 's/"//g')
+        if (( $(echo "$medianAbsolutePercentError > 0.01" |bc -l) )); then
+            echo "Benchmark $bench has a medianAbsolutePercentError(elapsed) of $medianAbsolutePercentError, rerunning"
+            bench_to_rerun="$bench_to_rerun $bench"
+        fi
+    done
+
+    bench_to_rerun=$(echo $bench_to_rerun | tr " " "\n")
+    if [ "$bench_to_rerun" != "" ]; then
+        time echo "$bench_to_rerun" | taskset -c 1-7 parallel --use-cores-instead-of-threads -k --halt now,fail=1 ./src/bench/bench_bitcoin -filter={} -min-time=$BENCH_DURATION -output-json={}-bench.json
+    fi
+
     # each file outputs {"results": [{...}]}
     # we want to merge all the results into one file
     echo '{"results": [' > bench.json
