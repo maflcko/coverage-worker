@@ -51,40 +51,45 @@ set -e
 if [ "$bench_exists" != "" ]; then
     echo "Bench data already exists for this commit"
 else
-    BENCH_DURATION=30000
+    BENCH_DURATION=1000
+    ./configure --enable-bench --disable-tests --disable-gui --disable-zmq --disable-fuzz --enable-fuzz-binary=no BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include"
+    make clean
+    time make -j$(nproc)
     pyperf system tune || true
 
     bench_list=$(./src/bench/bench_bitcoin -list)
-    time echo "$bench_list" | taskset -c 1-7 parallel --use-cores-instead-of-threads -k --halt now,fail=1 ./src/bench/bench_bitcoin -filter={} -min-time=$BENCH_DURATION -output-json={}-bench.json
+    time echo "$bench_list" | taskset -c 1-7 parallel --use-cores-instead-of-threads --halt now,fail=1 valgrind --tool=cachegrind --I1=32768,8,64 --D1=32768,8,64 --LL=8388608,16,64 --cachegrind-out-file=bench_{}.cachegrind ./src/bench/bench_bitcoin -filter={} -min-time=$BENCH_DURATION
 
-    # check that all benchmarks have a medianAbsolutePercentError(elapsed) < 0.01 (1%), otherwise rerun them
-    bench_to_rerun=""
+    # bench.json
+    total_bench="["
+    # convert each cachegrind file summary to json
     for bench in $bench_list; do
-        medianAbsolutePercentError=$(cat $bench-bench.json | jq '.results[0]["medianAbsolutePercentError(elapsed)"]' | sed 's/"//g')
-        if (( $(echo "$medianAbsolutePercentError > 0.01" |bc -l) )); then
-            echo "Benchmark $bench has a medianAbsolutePercentError(elapsed) of $medianAbsolutePercentError, rerunning"
-            bench_to_rerun="$bench_to_rerun $bench"
-        fi
+    # events: Ir I1mr ILmr Dr D1mr DLmr Dw D1mw DLmw 
+        cachegrind_events=$(grep 'events:' bench_$bench.cachegrind | sed 's/events: //')
+        cachegrind_summary=$(grep 'summary:' bench_$bench.cachegrind | sed 's/summary: //')
+
+        # split by space the events
+        IFS=' ' read -r -a events <<< "$cachegrind_events"
+        IFS=' ' read -r -a summary <<< "$cachegrind_summary"
+
+        # create json object
+        json="{"
+        # add bench name
+        json="$json\"name\": \"$bench\","
+        for i in "${!events[@]}"; do
+            json="$json\"${events[$i]}\": ${summary[$i]},"
+        done
+
+        # remove last comma
+        json="${json::-1}}"
+        total_bench="$total_bench$json,"
     done
 
-    bench_to_rerun=$(echo $bench_to_rerun | tr " " "\n")
-    if [ "$bench_to_rerun" != "" ]; then
-        time echo "$bench_to_rerun" | taskset -c 1-7 parallel --use-cores-instead-of-threads -k --halt now,fail=1 ./src/bench/bench_bitcoin -filter={} -min-time=$BENCH_DURATION -output-json={}-bench.json
-    fi
-
-    # each file outputs {"results": [{...}]}
-    # we want to merge all the results into one file
-    echo '{"results": [' > bench.json
-    for bench in $bench_list; do
-        cat $bench-bench.json | jq '.results[0]' >> bench.json
-        echo "," >> bench.json
-    done
     # remove last comma
-    sed -i '$ s/.$//' bench.json
-    echo "]}" >> bench.json
+    total_bench="${total_bench::-1}]"
+    echo "$total_bench" | jq
 
     aws s3 cp bench.json $S3_BENCH_FILE
-
     pyperf system reset || true
 fi
 
