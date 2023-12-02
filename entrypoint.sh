@@ -57,7 +57,7 @@ else
     time make -j$(nproc)
 
     # set perf max sample rate to 1
-    echo 1 | sudo tee /proc/sys/kernel/perf_event_max_sample_rate
+    echo 1 | tee /proc/sys/kernel/perf_event_max_sample_rate
 
     bench_list=$(./src/bench/bench_bitcoin -list)
     time echo "$bench_list" | taskset -c 1-7 parallel --use-cores-instead-of-threads --halt now,fail=1 valgrind --tool=cachegrind --I1=32768,8,64 --D1=32768,8,64 --LL=8388608,16,64 --cachegrind-out-file=bench_{}.cachegrind ./src/bench/bench_bitcoin -filter={} -min-time=$BENCH_DURATION
