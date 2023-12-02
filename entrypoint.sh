@@ -87,7 +87,7 @@ else
 
     # remove last comma
     total_bench="${total_bench::-1}]"
-    echo "$total_bench" | jq
+    echo "$total_bench" > bench.json
 
     aws s3 cp bench.json $S3_BENCH_FILE
     pyperf system reset || true
