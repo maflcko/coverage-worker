@@ -3,6 +3,7 @@ set -e
 ccache --show-stats
 
 cd /tmp/bitcoin && git pull origin master
+MASTER_COMMIT=$(git rev-parse HEAD)
 
 if [ "$IS_MASTER" != "true" ]; then
     git fetch origin pull/$PR_NUM/head && git checkout FETCH_HEAD
@@ -41,6 +42,10 @@ else
     time gcovr --json --gcov-ignore-errors=no_working_dir_found --gcov-ignore-parse-errors -e depends -e src/test -e src/leveldb -e src/bench -e src/qt -j $(nproc) > coverage.json
 
     aws s3 cp coverage.json $S3_COVERAGE_FILE
+    if [ "$IS_MASTER" != "true" ]; then
+        echo $MASTER_COMMIT > .base_commit
+        aws s3 cp .base_commit s3://$S3_BUCKET_DATA/$PR_NUM/$HEAD_COMMIT/.base_commit
+    fi
 fi
 
 set +e
