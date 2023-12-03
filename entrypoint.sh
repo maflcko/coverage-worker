@@ -13,19 +13,19 @@ if [ "$IS_MASTER" != "true" ]; then
     fi
     
     git rebase master
-    S3_COVERAGE_FILE=s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/coverage.json
-    S3_BENCH_FILE=s3://bitcoin-coverage-data/$PR_NUM/$HEAD_COMMIT/bench.json
+    S3_COVERAGE_FILE=s3://$S3_BUCKET_DATA/$PR_NUM/$HEAD_COMMIT/coverage.json
+    S3_BENCH_FILE=s3://$S3_BUCKET_ARTIFACTS/$PR_NUM/$HEAD_COMMIT/bench_bitcoin
 else
     git checkout $COMMIT
-    S3_COVERAGE_FILE=s3://bitcoin-coverage-data/master/$COMMIT/coverage.json
-    S3_BENCH_FILE=s3://bitcoin-coverage-data/master/$COMMIT/bench.json
+    S3_COVERAGE_FILE=s3://$S3_BUCKET_DATA/master/$COMMIT/coverage.json
+    S3_BENCH_FILE=s3://$S3_BUCKET_ARTIFACTS/master/$COMMIT/bench_bitcoin
 fi
 
 ./test/get_previous_releases.py -b
 
 NPROC_2=$(expr $(nproc) \* 2)
 
-./autogen.sh && ./configure --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
+./autogen.sh && ./configure --disable-bench --disable-fuzz --enable-fuzz-binary=no --with-gui=no --disable-zmq BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include" --enable-lcov #--enable-extended-functional-tests
 time compiledb make -j$(nproc)
 
 set +e
@@ -43,56 +43,11 @@ else
     aws s3 cp coverage.json $S3_COVERAGE_FILE
 fi
 
+./configure --enable-bench --disable-tests --disable-gui --disable-zmq --disable-fuzz --enable-fuzz-binary=no BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include"
+make clean
+time make -j$(nproc)
 
-set +e
-bench_exists=$(aws s3 ls $S3_BENCH_FILE)
-set -e
-
-if [ "$bench_exists" != "" ]; then
-    echo "Bench data already exists for this commit"
-else
-    BENCH_DURATION=30000
-    ./configure --enable-bench --disable-tests --disable-gui --disable-zmq --disable-fuzz --enable-fuzz-binary=no BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include"
-    make clean
-    time make -j$(nproc)
-
-    # set perf max sample rate to 1
-    echo 1 | tee /proc/sys/kernel/perf_event_max_sample_rate
-
-    bench_list=$(./src/bench/bench_bitcoin -list)
-    time echo "$bench_list" | taskset -c 1-7 parallel --use-cores-instead-of-threads --halt now,fail=1 valgrind --tool=cachegrind --I1=32768,8,64 --D1=32768,8,64 --LL=8388608,16,64 --cachegrind-out-file=bench_{}.cachegrind ./src/bench/bench_bitcoin -filter={} -min-time=$BENCH_DURATION
-
-    # bench.json
-    total_bench="["
-    # convert each cachegrind file summary to json
-    for bench in $bench_list; do
-    # events: Ir I1mr ILmr Dr D1mr DLmr Dw D1mw DLmw 
-        cachegrind_events=$(grep 'events:' bench_$bench.cachegrind | sed 's/events: //')
-        cachegrind_summary=$(grep 'summary:' bench_$bench.cachegrind | sed 's/summary: //')
-
-        # split by space the events
-        IFS=' ' read -r -a events <<< "$cachegrind_events"
-        IFS=' ' read -r -a summary <<< "$cachegrind_summary"
-
-        # create json object
-        json="{"
-        # add bench name
-        json="$json\"name\": \"$bench\","
-        for i in "${!events[@]}"; do
-            json="$json\"${events[$i]}\": ${summary[$i]},"
-        done
-
-        # remove last comma
-        json="${json::-1}}"
-        total_bench="$total_bench$json,"
-    done
-
-    # remove last comma
-    total_bench="${total_bench::-1}]"
-    echo "$total_bench" > bench.json
-
-    aws s3 cp bench.json $S3_BENCH_FILE
-fi
+aws s3 cp src/bench/bench_bitcoin $S3_BENCH_FILE
 
 # if [ "$IS_MASTER" != "true" ]; then
 #     echo "Updating $PR_NUM branch on sonarcloud"
