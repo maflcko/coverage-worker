@@ -25,4 +25,4 @@ jobs:
         file: ./Dockerfile
         push: true
         platforms: linux/arm64
-        tags: public.ecr.aws/i3s2n0b6/bitcoin-coverage-coverage-worker:latest
+        tags: public.ecr.aws/i3s2n0b6/corecheck-coverage-worker:latest
