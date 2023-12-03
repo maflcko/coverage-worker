@@ -60,30 +60,3 @@ else
     time make -j$(nproc)
     aws s3 cp src/bench/bench_bitcoin $S3_BENCH_FILE
 fi
-
-# if [ "$IS_MASTER" != "true" ]; then
-#     echo "Updating $PR_NUM branch on sonarcloud"
-#     time /usr/lib/sonar-scanner/bin/sonar-scanner \
-#     -Dsonar.organization=aureleoules \
-#     -Dsonar.projectKey=aureleoules_bitcoin \
-#     -Dsonar.sources=. \
-#     -Dsonar.cfamily.compile-commands=compile_commands.json \
-#     -Dsonar.host.url=https://sonarcloud.io \
-#     -Dsonar.exclusions='src/crc32c/**, src/crypto/ctaes/**, src/leveldb/**, src/minisketch/**, src/secp256k1/**, src/univalue/**' \
-#     -Dsonar.cfamily.threads=$(nproc) \
-#     -Dsonar.branch.name=$PR_NUM \
-#     -Dsonar.cfamily.analysisCache.mode=server \
-#     -Dsonar.branch.target=master
-# else
-#     echo "Updating master branch on sonarcloud"
-#     time /usr/lib/sonar-scanner/bin/sonar-scanner \
-#     -Dsonar.organization=aureleoules \
-#     -Dsonar.projectKey=aureleoules_bitcoin \
-#     -Dsonar.sources=. \
-#     -Dsonar.cfamily.compile-commands=compile_commands.json \
-#     -Dsonar.host.url=https://sonarcloud.io \
-#     -Dsonar.exclusions='src/crc32c/**, src/crypto/ctaes/**, src/leveldb/**, src/minisketch/**, src/secp256k1/**, src/univalue/**' \
-#     -Dsonar.cfamily.threads=$(nproc) \
-#     -Dsonar.branch.name=master \
-#     -Dsonar.cfamily.analysisCache.mode=server
-# fi
