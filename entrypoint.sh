@@ -43,11 +43,18 @@ else
     aws s3 cp coverage.json $S3_COVERAGE_FILE
 fi
 
-./configure --enable-bench --disable-tests --disable-gui --disable-zmq --disable-fuzz --enable-fuzz-binary=no BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include"
-make clean
-time make -j$(nproc)
+set +e
+bench_exists=$(aws s3 ls $S3_BENCH_FILE)
+set -e
 
-aws s3 cp src/bench/bench_bitcoin $S3_BENCH_FILE
+if [ "$bench_exists" != "" ]; then
+    echo "Bench binary already exists for this commit"
+else
+    ./configure --enable-bench --disable-tests --disable-gui --disable-zmq --disable-fuzz --enable-fuzz-binary=no BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" BDB_CFLAGS="-I${BDB_PREFIX}/include"
+    make clean
+    time make -j$(nproc)
+    aws s3 cp src/bench/bench_bitcoin $S3_BENCH_FILE
+fi
 
 # if [ "$IS_MASTER" != "true" ]; then
 #     echo "Updating $PR_NUM branch on sonarcloud"
